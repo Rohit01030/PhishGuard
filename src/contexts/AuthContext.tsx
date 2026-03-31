@@ -1,13 +1,12 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { User, AuthError } from '@supabase/supabase-js';
+import { User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  signUp: (email: string, password: string) => Promise<{ error: AuthError | null }>;
-  signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
-  signInWithGoogle: () => Promise<{ error: AuthError | null }>;
+  sendOTP: (email: string) => Promise<{ success: boolean; error?: string }>;
+  verifyOTP: (email: string, code: string) => Promise<{ success: boolean; user?: User; error?: string }>;
   signOut: () => Promise<void>;
 }
 
@@ -17,14 +16,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const handleUserProfile = async (authUser: User, isNewUser: boolean) => {
+  const handleUserProfile = async (authUser: User) => {
     try {
       const email = authUser.email || '';
-
-      if (!email.includes('@gmail.com')) {
-        await supabase.auth.signOut();
-        throw new Error('Only Gmail accounts are allowed to use PhishGuard');
-      }
 
       const functionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/handle-user-signup`;
 
@@ -39,18 +33,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email,
           full_name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'User',
           avatar_url: authUser.user_metadata?.avatar_url,
-          is_new_user: isNewUser,
+          is_new_user: true,
         }),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create user profile');
+        console.error('Profile creation error:', errorData);
       }
     } catch (error) {
       console.error('Profile handling error:', error);
-      await supabase.auth.signOut();
-      throw error;
     }
   };
 
@@ -66,7 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (event === 'SIGNED_IN' && session?.user) {
           try {
-            await handleUserProfile(session.user, false);
+            await handleUserProfile(session.user);
           } catch (error) {
             console.error('Error handling user profile:', error);
           }
@@ -77,44 +69,76 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signUp = async (email: string, password: string) => {
+  const sendOTP = async (email: string) => {
     try {
-      if (!email.includes('@gmail.com')) {
-        return { error: new Error('Only Gmail accounts are allowed') as unknown as AuthError };
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-otp`;
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        return { success: false, error: data.error || 'Failed to send OTP' };
       }
 
-      const { error } = await supabase.auth.signUp({ email, password });
-      return { error };
+      return { success: true };
     } catch (error) {
-      return { error: error as unknown as AuthError };
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to send OTP' };
     }
   };
 
-  const signIn = async (email: string, password: string) => {
+  const verifyOTP = async (email: string, code: string) => {
     try {
-      if (!email.includes('@gmail.com')) {
-        return { error: new Error('Only Gmail accounts are allowed') as unknown as AuthError };
+      const { data, error } = await supabase
+        .from('otp_codes')
+        .select('*')
+        .eq('email', email)
+        .eq('code', code)
+        .maybeSingle();
+
+      if (error || !data) {
+        return { success: false, error: 'Invalid OTP code' };
       }
 
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      return { error };
-    } catch (error) {
-      return { error: error as unknown as AuthError };
-    }
-  };
+      if (new Date(data.expires_at) < new Date()) {
+        return { success: false, error: 'OTP code has expired' };
+      }
 
-  const signInWithGoogle = async () => {
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password: Math.random().toString(36).slice(-32),
         options: {
-          redirectTo: `${window.location.origin}`,
-          scopes: 'email profile',
+          data: {
+            email_verified: true,
+          },
         },
       });
-      return { error };
+
+      if (signUpError) {
+        if (signUpError.message.includes('already registered')) {
+          const { data: sessionData, error: sessionError } = await supabase.auth.signInWithPassword({
+            email,
+            password: Math.random().toString(36).slice(-32),
+          });
+
+          if (sessionError && sessionError.message.includes('Invalid login credentials')) {
+            return { success: false, error: 'Account exists but password-based login not supported. Try OTP again.' };
+          }
+        }
+        return { success: false, error: signUpError.message };
+      }
+
+      await supabase.from('otp_codes').delete().eq('email', email);
+
+      return { success: true, user: signUpData.user ?? undefined };
     } catch (error) {
-      return { error: error as unknown as AuthError };
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to verify OTP' };
     }
   };
 
@@ -123,7 +147,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, signUp, signIn, signInWithGoogle, signOut }}>
+    <AuthContext.Provider value={{ user, loading, sendOTP, verifyOTP, signOut }}>
       {children}
     </AuthContext.Provider>
   );
