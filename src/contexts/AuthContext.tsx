@@ -110,9 +110,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { success: false, error: 'OTP code has expired' };
       }
 
+      const randomPassword = Math.random().toString(36).slice(-32);
+
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email,
-        password: Math.random().toString(36).slice(-32),
+        password: randomPassword,
         options: {
           data: {
             email_verified: true,
@@ -124,7 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (signUpError.message.includes('already registered')) {
           const { data: sessionData, error: sessionError } = await supabase.auth.signInWithPassword({
             email,
-            password: Math.random().toString(36).slice(-32),
+            password: randomPassword,
           });
 
           if (sessionError && sessionError.message.includes('Invalid login credentials')) {
