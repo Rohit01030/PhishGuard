@@ -3,10 +3,9 @@ import { EmailAnalyzer } from './EmailAnalyzer';
 
 interface PhishingCheckPageProps {
   onBack: () => void;
-  onAuthRequired: () => void;
 }
 
-export function PhishingCheckPage({ onBack, onAuthRequired }: PhishingCheckPageProps) {
+export function PhishingCheckPage({ onBack }: PhishingCheckPageProps) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -25,7 +24,7 @@ export function PhishingCheckPage({ onBack, onAuthRequired }: PhishingCheckPageP
           </p>
         </div>
 
-        <EmailAnalyzer onAuthRequired={onAuthRequired} />
+        <EmailAnalyzer />
 
         <div className="mt-16 grid md:grid-cols-2 gap-8">
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">

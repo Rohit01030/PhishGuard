@@ -1,8 +1,5 @@
 import { useState } from 'react';
 import { Mail, AlertTriangle, Send, Loader2 } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
-import { supabase } from '../lib/supabase';
-import { FeedbackWidget } from './FeedbackWidget';
 
 interface AnalysisResult {
   riskScore: number;
@@ -17,17 +14,11 @@ interface AnalysisResult {
   recommendations: string[];
 }
 
-interface EmailAnalyzerProps {
-  onAuthRequired: () => void;
-}
-
-export function EmailAnalyzer({ onAuthRequired }: EmailAnalyzerProps) {
+export function EmailAnalyzer() {
   const [emailContent, setEmailContent] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState('');
-  const [analysisId, setAnalysisId] = useState<string | null>(null);
-  const { user } = useAuth();
 
   const handleAnalyze = async () => {
     if (!emailContent.trim()) {
@@ -41,15 +32,10 @@ export function EmailAnalyzer({ onAuthRequired }: EmailAnalyzerProps) {
 
     try {
       const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-email`;
-      const session = await supabase.auth.getSession();
 
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
       };
-
-      if (session.data.session?.access_token) {
-        headers['Authorization'] = `Bearer ${session.data.session.access_token}`;
-      }
 
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -63,20 +49,6 @@ export function EmailAnalyzer({ onAuthRequired }: EmailAnalyzerProps) {
 
       const analysisResult: AnalysisResult = await response.json();
       setResult(analysisResult);
-
-      if (user) {
-        const { data, error: insertError } = await supabase.from('email_analyses').insert({
-          user_id: user.id,
-          email_content: emailContent,
-          risk_score: analysisResult.riskScore,
-          risk_level: analysisResult.riskLevel,
-          analysis_result: analysisResult,
-        }).select('id').maybeSingle();
-
-        if (data?.id) {
-          setAnalysisId(data.id);
-        }
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to analyze email');
     } finally {
@@ -137,17 +109,6 @@ export function EmailAnalyzer({ onAuthRequired }: EmailAnalyzerProps) {
           <div className="mt-4 text-red-600 text-sm bg-red-50 p-3 rounded-lg flex items-center space-x-2">
             <AlertTriangle size={18} />
             <span>{error}</span>
-          </div>
-        )}
-
-        {!user && (
-          <div className="mt-4 bg-blue-50 border border-blue-200 p-4 rounded-lg">
-            <p className="text-blue-900 text-sm">
-              <strong>Tip:</strong> Sign in to save your analysis history and access it anytime.{' '}
-              <button onClick={onAuthRequired} className="underline font-semibold hover:text-blue-700">
-                Sign in now
-              </button>
-            </p>
           </div>
         )}
 
@@ -241,18 +202,6 @@ export function EmailAnalyzer({ onAuthRequired }: EmailAnalyzerProps) {
             </ul>
           </div>
 
-          {user && analysisId && (
-            <FeedbackWidget
-              analysisId={analysisId}
-              emailContent={emailContent}
-              currentRiskLevel={result.riskLevel}
-              onFeedbackSubmitted={() => {
-                setEmailContent('');
-                setResult(null);
-                setAnalysisId(null);
-              }}
-            />
-          )}
         </div>
       )}
     </div>
