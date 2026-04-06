@@ -19,18 +19,22 @@ export interface EmailFeatures {
 const SUSPICIOUS_WORDS = [
   'verify', 'confirm', 'update', 'urgent', 'immediate', 'action',
   'click', 'password', 'account', 'suspended', 'locked', 'expires',
-  'expiring', 'today', 'agora', 'hoje', 'resgate', 'pontos'
+  'expiring', 'today', 'agora', 'hoje', 'resgate', 'pontos',
+  'reconfirm', 're-confirm', 'authenticate', 'authorization',
+  'security alert', 'unusual activity', 'unauthorized access',
+  'validate', 'compliance', 'confirm receipt', 'pending',
+  'limited', 'restricted', 'disabled', 'frozen', 'deactivated'
 ];
 
 export function extractFeatures(emailContent: string, analysisResult?: any): EmailFeatures {
   const hasFailedAuth = /spf=(fail|temperror|softfail)|dkim=(fail|none)|compauth=fail/i.test(emailContent) ? 1 : 0;
-  const hasSpoofedDomain = /from:.*@(?!bradesco\.com\.br|bbcombr\.com\.br|bb\.com\.br|google\.com|apple\.com|microsoft\.com|amazon\.com).*\.(com|br|net)|@atendimento\.com\.br|@seguimento/i.test(emailContent) ? 1 : 0;
-  const hasSuspiciousLinks = /(bit\.ly|tinyurl|goo\.gl|href=.*blog\d+|\.me\/|my.*domain)/i.test(emailContent) ? 1 : 0;
-  const hasUrgentLanguage = /(urgent|immediate|expir|hoje|today|agora|now).{0,30}(action|points|pontos|resgate)/i.test(emailContent) ? 1 : 0;
-  const hasCredentialRequest = /(password|social security|ssn|credit card|verify.*account|confirm.*identity|acesso|senha)/i.test(emailContent) ? 1 : 0;
-  const hasGenericGreeting = /(dear customer|dear user|valued member|vocês?|cliente)/i.test(emailContent) ? 1 : 0;
-  const hasAttachments = /attachment.*\.(exe|zip|scr|bat|cmd|vbs|jar)/i.test(emailContent) ? 1 : 0;
-  const hasTooGoodOffer = /(congratulations.*prize|won.*prize|claim.*reward|free money|pontos.*expir|resgat)/i.test(emailContent) ? 1 : 0;
+  const hasSpoofedDomain = /from:.*@(?!bradesco\.com\.br|bbcombr\.com\.br|bb\.com\.br|google\.com|apple\.com|microsoft\.com|amazon\.com|support\.|noreply\.).*\.(com|br|net)|@atendimento\.com\.br|@seguimento|return-path:.*different|from:.*reply-to:|display.*name.*mismatch/i.test(emailContent) ? 1 : 0;
+  const hasSuspiciousLinks = /(bit\.ly|tinyurl|goo\.gl|href=.*blog\d+|\.me\/|my.*domain|href=.*\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|shortened|ipv4|update-account|verify-account|confirm-account)/i.test(emailContent) ? 1 : 0;
+  const hasUrgentLanguage = /(urgent|immediate|expir|hoje|today|agora|now|act now|limited time|verify now|must.*immediately).{0,40}(action|points|pontos|resgate|account|password)/i.test(emailContent) ? 1 : 0;
+  const hasCredentialRequest = /(password|social security|ssn|credit card|verify.*account|confirm.*identity|acesso|senha|bank.*details|reconfirm|re-confirm|authenticate|update.*payment|validate.*account)/i.test(emailContent) ? 1 : 0;
+  const hasGenericGreeting = /(dear (customer|user|member|valued|sir|madam)|valued (customer|member)|to whom it may concern|vocês?|cliente|user|account holder|dear)/i.test(emailContent) ? 1 : 0;
+  const hasAttachments = /attachment.*\.(exe|zip|scr|bat|cmd|vbs|jar|ps1|dll|msi|app)/i.test(emailContent) ? 1 : 0;
+  const hasTooGoodOffer = /(congratulations.*prize|won.*prize|claim.*reward|free money|pontos.*expir|resgat|inheritance|lottery|million|exclusive.*offer|limited.*deal)/i.test(emailContent) ? 1 : 0;
 
   const linkCount = (emailContent.match(/href=/gi) || []).length;
   const urlMismatchCount = (emailContent.match(/href=.*>(?!https?:\/\/)[^<]+</i) || []).length;
