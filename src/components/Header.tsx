@@ -1,7 +1,11 @@
 import { Shield } from 'lucide-react';
 import { HealthMonitor } from './HealthMonitor';
 
-export function Header() {
+interface HeaderProps {
+  onStatusClick?: () => void;
+}
+
+export function Header({ onStatusClick }: HeaderProps) {
   return (
     <header className="bg-white border-b border-gray-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -15,8 +19,18 @@ export function Header() {
               <p className="text-xs text-gray-500">Email Security Scanner</p>
             </div>
           </div>
-          <div className="hidden sm:block">
-            <HealthMonitor />
+          <div className="flex items-center gap-4">
+            {onStatusClick && (
+              <button
+                onClick={onStatusClick}
+                className="text-sm font-medium text-gray-700 hover:text-blue-600 transition-colors"
+              >
+                System Status
+              </button>
+            )}
+            <div className="hidden sm:block">
+              <HealthMonitor />
+            </div>
           </div>
         </div>
       </div>
